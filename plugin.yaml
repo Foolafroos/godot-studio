@@ -1,3 +1,15 @@
 name: godot-studio
+label: Godot Studio
 version: "0.1.0"
-description: "Headless Godot workflows for the agent game studio — script checks, CI exports, and the godot-ai onboarding path"
+description: >
+  Headless Godot 4 workflows for the agent game studio — script/resource
+  validation without an editor (godot --headless), CI-style exports from
+  named presets, and a godot-ai onboarding report. Complements the
+  hi-godot/godot-ai MCP server (live editor editing) with the half of the
+  loop that needs no GUI: verify → export → playtest. Bundles the
+  godot-studio skill teaching the full loop.
+author: Fool (Dingbat)
+provides_tools:
+  - godot_headless_check
+  - godot_export
+  - godot_setup

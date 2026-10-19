@@ -78,7 +78,10 @@ def register(ctx):
         result = _run(args)
         return json.dumps(result)
 
-    ctx.register_tool("godot_headless_check", check_schema, handle_check)
+    ctx.register_tool(
+        "godot_headless_check", toolset="godot", schema=check_schema,
+        handler=handle_check, check_fn=lambda: godot is not None,
+    )
 
     # ── Tool: CI-style export ──
     export_schema = {
@@ -106,7 +109,10 @@ def register(ctx):
         result = _run([godot, "--headless", "--path", project, flag, preset, out], timeout=900)
         return json.dumps(result)
 
-    ctx.register_tool("godot_export", export_schema, handle_export)
+    ctx.register_tool(
+        "godot_export", toolset="godot", schema=export_schema,
+        handler=handle_export, check_fn=lambda: godot is not None,
+    )
 
     # ── Tool: onboarding state (what is installed, what to run next) ──
     setup_schema = {
@@ -139,4 +145,4 @@ def register(ctx):
         )
         return json.dumps(state)
 
-    ctx.register_tool("godot_setup", setup_schema, handle_setup)
+    ctx.register_tool("godot_setup", toolset="godot", schema=setup_schema, handler=handle_setup)
