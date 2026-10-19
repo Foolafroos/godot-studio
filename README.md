@@ -1,53 +1,64 @@
-# godot-studio — Hermes plugin for the agent game studio
+# godot-studio — headless Godot workflows for the agent game studio
 
-Réponse au besoin exprimé par Teknium (thread « DIY game dev studio », oct. 2026) :
-il manque un chemin **Godot** officiel dans l'écosystème Hermes.
+Hermes Agent plugin + skill. Godot was the missing engine in the agent game
+studio: `hi-godot/godot-ai` already bridges a **live editor** to agents
+(46 MCP tools, Hermes is a supported client), but nothing covered the half of
+the loop that needs **no GUI** — verifying a project, exporting builds, closing
+the loop a playtester can read. This plugin covers that half.
 
-## État de l'écosystème (vérifié le 19/10/2026)
+## What it adds
 
-| Projet | Stars | Licence | Activité | Rôle |
+Three tools (toolset `godot`), registered only when a Godot 4 binary is found
+(`check_fn`):
+
+- **`godot_headless_check`** — runs `godot --headless --quit` (or
+  `--quit-after N` frames) against a project and surfaces script/resource
+  errors without an editor. Run it after every batch of MCP edits, before
+  claiming progress.
+- **`godot_export`** — CI-style export from a named export preset
+  (`--export-release` / `--export-debug`), e.g. a Web build a playtester agent
+  can actually load.
+- **`godot_setup`** — reports Godot / godot-ai / uv install state and emits the
+  exact registration path for the godot-ai MCP server. It installs nothing.
+
+Plus the **`godot-studio` skill**: the full loop — edit via godot-ai MCP →
+headless verify → export → playtest — with the pitfalls that cost real hours
+(a project without `run/main_scene` errors differently than a broken script;
+`--quit` validates parse-time only, `--quit-after` reaches runtime; export
+presets must exist in the project first).
+
+## Requirements
+
+- Godot 4.x on PATH or `/Applications/Godot.app` (macOS). Tested on 4.7.2.
+- Optional but recommended: the godot-ai addon for the editing half
+  (https://github.com/hi-godot/godot-ai, MIT — needs its own editor + uv).
+
+## Disclosed behaviour (catalog rule 13)
+
+- **Shell commands**: `godot --headless …` (the local Godot binary) and a
+  read-only `hermes mcp list` inside `godot_setup`. Nothing else is executed.
+- **No network calls** by the plugin itself; no reads outside the Godot project
+  the caller targets.
+- **No stored credentials, no telemetry, no background processes.**
+- `godot_export` writes into the output path the caller supplies.
+
+## Why this shape
+
+Hermes plugin convention: atomic tools in `__init__.py`, workflow intelligence
+in the bundled skill. The plugin deliberately does not wrap godot-ai — two
+bridges to one editor is one too many. It is the verification and export leg,
+and the skill teaches the agent when to use which half.
+
+## Ecosystem map (verified 2026-10-19)
+
+| Project | Stars | License | Activity | Role |
 |---|---|---|---|---|
-| `hi-godot/godot-ai` | 1.9k | MIT | très active (commits août 2026) | **46 outils MCP, cite Hermes Agent comme client supporté** (`godot-ai attach` stdio). Nécessite Godot 4.7+ et `uv`. |
-| `Coding-Solo/godot-mcp` | 5.4k | MIT | quiet depuis avril 2026 | le plus étoilé, mais dormeur |
-| `yurineko73/Godot-MCP-Native` | 722 | MIT | active | 155 outils, pur GDScript, **zéro dépendance Node/Python**, CLI `gdmcp` à découverte progressive |
-| `youichi-uda/godot-mcp-pro` | 575 | commerciale | active | 175 outils, Asset Library |
+| `hi-godot/godot-ai` | 1.9k | MIT | very active | 46 MCP tools, Hermes listed as supported client (`godot-ai attach` stdio). Needs Godot 4.7+ and uv. |
+| `Coding-Solo/godot-mcp` | 5.4k | MIT | quiet since 2026-04 | most starred, dormant |
+| `yurineko73/Godot-MCP-Native` | 722 | MIT | active | 155 tools, pure GDScript, zero Node/Python deps, `gdmcp` CLI with progressive discovery |
+| `youichi-uda/godot-mcp-pro` | 575 | commercial | active | 175 tools, Asset Library |
 
-## Positionnement de ce plugin
+## Status
 
-godot-ai fait déjà le pont éditeur↔agent. Le plugin n'emballe pas ce pont — il ajoute ce qui manque :
-
-1. **Mode headless** : `godot --headless --quit` (validation de scripts sans éditeur),
-   export CI (`--export-release`). godot-ai exige un éditeur vivant ; le studio
-   agentique a besoin de vérifications reproductibles sans GUI.
-2. **Skill `godot-studio`** : le workflow complet — enregistrement godot-ai,
-   scaffold, édition via MCP, check headless, export web, playtest.
-3. **Accroche playtester** : le lien avec REA (observation native du build joué)
-   est documenté dans le skill ; l'outillage complet est un chantier séparé.
-
-## Structure
-
-```
-plugin.yaml          manifeste Hermes (name/version/description)
-__init__.py          couche tools atomiques (headless check, export, setup)
-skills/godot-studio/ couche intelligence (workflow, enchaînements)
-vendor/              clones d'étude (godot-ai, Godot-MCP-Native) — ne pas packager
-```
-
-## Installation (dev)
-
-```bash
-cp -r . ~/.hermes/plugins/godot-studio   # ou symlink
-# puis : hermes mcp add godot-ai ... (le tool godot_setup donne la commande exacte)
-```
-
-## Prérequis
-
-- Godot 4.x (cask `godot-4`), `uv` pour godot-ai.
-- Le tool `godot_setup` détecte l'état et génère les commandes manquantes.
-
-## Prochaines étapes
-
-- [ ] Tester les tools contre un projet de démo (scaffold minimal).
-- [ ] Valider le format de manifeste contre la doc plugin officielle / un plugin officiel.
-- [ ] Proposer le plugin au catalogue (tier community d'abord).
-- [ ] Évaluer Godot-MCP-Native (`gdmcp` CLI) comme variante sans dépendances.
+Validated with `hermes plugins validate --install-deps` (all checks green).
+Headless check verified end-to-end on Godot 4.7.2 (`test/hello`).
