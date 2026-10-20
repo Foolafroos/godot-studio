@@ -1,7 +1,7 @@
 ---
 name: godot-studio
 description: "Use when an agent builds or tests a Godot game project."
-version: 0.1.0
+version: 0.2.0
 author: Min (Dingbat) for the Hermes game-studio plugin effort
 license: MIT
 metadata:
@@ -27,7 +27,16 @@ metadata:
 2. **Headless-side (verification)**: the `godot-studio` plugin tools.
    - `godot_headless_check <project>` → scripts parse, resources load, errors surface. No editor needed.
    - `godot_export <project> <preset>` → CI builds (Web/macOS/…).
+   - `godot_builds <project>` → every export preset and the state of its artifact
+     (exists, size, modified). Check before re-exporting; use the artifact path after.
    - `godot_setup` → install state + exact registration command.
+
+## Deliver the build in chat
+
+After a successful `godot_export`, call `godot_builds` to confirm the artifact,
+then attach it in the reply: `MEDIA:/absolute/path/to/artifact` (the desktop app
+renders it as a card; zip/pck/exe attach as files). Never claim a build without
+the artifact existing in `godot_builds` output.
 
 ## The loop
 

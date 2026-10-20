@@ -8,7 +8,7 @@ the loop a playtester can read. This plugin covers that half.
 
 ## What it adds
 
-Three tools (toolset `godot`), registered only when a Godot 4 binary is found
+Four tools (toolset `godot`), registered only when a Godot 4 binary is found
 (`check_fn`):
 
 - **`godot_headless_check`** — runs `godot --headless --quit` (or
@@ -18,8 +18,25 @@ Three tools (toolset `godot`), registered only when a Godot 4 binary is found
 - **`godot_export`** — CI-style export from a named export preset
   (`--export-release` / `--export-debug`), e.g. a Web build a playtester agent
   can actually load.
+- **`godot_builds`** — lists every export preset in the project and the state
+  of its artifact (exists, size, modified). The gallery data: check before
+  re-exporting, attach the fresh artifact in chat (`MEDIA:`) after.
 - **`godot_setup`** — reports Godot / godot-ai / uv install state and emits the
   exact registration path for the godot-ai MCP server. It installs nothing.
+
+## Optional desktop companion (unified package)
+
+This package ships a desktop half (`desktop/plugin.js`) plus its read-only
+backend (`dashboard/plugin_api.py`), following the Hermes
+“One package, both SDKs” layout. When the package is installed under a
+`plugins/` root, the desktop app picks up the UI half automatically
+(opt-in, off until enabled in Capabilities → Plugins):
+
+- a **statusbar chip** showing the installed Godot version;
+- a **Godot builds pane**: pick a project, see its presets and artifacts
+  (size, state, time) — the same data `godot_builds` exposes to the agent.
+
+The pane degrades gracefully when the Python backend is not enabled.
 
 Plus the **`godot-studio` skill**: the full loop — edit via godot-ai MCP →
 headless verify → export → playtest — with the pitfalls that cost real hours
@@ -35,10 +52,12 @@ presets must exist in the project first).
 
 ## Disclosed behaviour (catalog rule 13)
 
-- **Shell commands**: `godot --headless …` (the local Godot binary) and a
-  read-only `hermes mcp list` inside `godot_setup`. Nothing else is executed.
+- **Shell commands**: `godot --headless …` (the local Godot binary), a read-only
+  `godot --version` in the desktop backend, and a read-only `hermes mcp list`
+  inside `godot_setup`. Nothing else is executed.
 - **No network calls** by the plugin itself; no reads outside the Godot project
-  the caller targets.
+  the caller targets (the desktop pane reads `export_presets.cfg` and artifact
+  metadata inside the project path the user configures in the pane).
 - **No stored credentials, no telemetry, no background processes.**
 - `godot_export` writes into the output path the caller supplies.
 

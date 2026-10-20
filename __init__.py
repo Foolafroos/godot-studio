@@ -40,6 +40,48 @@ def _run(args: list[str], timeout: int = 300) -> dict:
         return {"returncode": -1, "stdout": "", "stderr": str(exc)}
 
 
+def _parse_presets(project: str) -> list[dict]:
+    """Parse export_presets.cfg → [{name, export_path, exists, size_bytes, modified}]."""
+    cfg = os.path.join(project, "export_presets.cfg")
+    if not os.path.exists(cfg):
+        return []
+    presets, current, section = [], {}, ""
+    try:
+        with open(cfg, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                line = line.strip()
+                if line.startswith("[") and line.endswith("]"):
+                    section = line[1:-1]
+                    if section.startswith("preset.") and ".options" not in section:
+                        if current.get("name"):
+                            presets.append(current)
+                        current = {}
+                    continue
+                if "=" in line and section.startswith("preset.") and ".options" not in section:
+                    key, _, val = line.partition("=")
+                    key, val = key.strip(), val.strip().strip('"')
+                    if key == "name":
+                        current["name"] = val
+                    elif key == "export_path":
+                        current["export_path"] = val
+        if current.get("name"):
+            presets.append(current)
+    except OSError:
+        return []
+    out = []
+    for p in presets:
+        entry = {"preset": p["name"], "export_path": p.get("export_path", "")}
+        artifact = os.path.normpath(os.path.join(project, entry["export_path"])) if entry["export_path"] else ""
+        entry["artifact_path"] = artifact
+        try:
+            st = os.stat(artifact)
+            entry.update({"exists": True, "size_bytes": st.st_size, "modified": int(st.st_mtime)})
+        except (OSError, ValueError):
+            entry.update({"exists": False, "size_bytes": 0, "modified": 0})
+        out.append(entry)
+    return out
+
+
 def register(ctx):
     godot = _godot_binary()
 
@@ -146,3 +188,31 @@ def register(ctx):
         return json.dumps(state)
 
     ctx.register_tool("godot_setup", toolset="godot", schema=setup_schema, handler=handle_setup)
+
+    # ── Tool: build gallery (presets + artifact state, for re-export decisions) ──
+    builds_schema = {
+        "name": "godot_builds",
+        "description": (
+            "List a project's export presets and the current state of their "
+            "artifacts (exists, size, modified time). Use before re-exporting "
+            "and to attach fresh builds in chat."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "project_path": {"type": "string"},
+            },
+            "required": ["project_path"],
+        },
+    }
+
+    def handle_builds(params, **kwargs):
+        project = params.get("project_path", "")
+        if not os.path.exists(os.path.join(project, "project.godot")):
+            return json.dumps({"error": f"no project.godot at {project}"})
+        return json.dumps({"project": project, "builds": _parse_presets(project)})
+
+    ctx.register_tool(
+        "godot_builds", toolset="godot", schema=builds_schema,
+        handler=handle_builds, check_fn=lambda: godot is not None,
+    )
