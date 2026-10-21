@@ -196,6 +196,18 @@ def register(ctx):
         # (always inside the project, past the containment guard above).
         os.makedirs(os.path.dirname(out), exist_ok=True)
         result = _run([godot, "--headless", "--path", project, flag, preset, out], timeout=900)
+        # Export templates are not bundled with the editor. When they are
+        # missing, surface the fix instead of raw engine stderr. The
+        # "export_templates" path fragment is locale-independent.
+        if result["returncode"] != 0 and "export_templates" in (result["stderr"] + result["stdout"]):
+            result["hint"] = (
+                "export templates for this platform are not installed. Install them "
+                "via the Godot editor (Project → Manage Export Templates) or "
+                "`godot --headless --install-export-templates`; if that stalls, "
+                "download the release .tpz from github.com/godotengine/godot-builds "
+                "and extract templates/* + version.txt into the export_templates/"
+                "<version> directory shown in the error."
+            )
         return json.dumps(result)
 
     ctx.register_tool(
