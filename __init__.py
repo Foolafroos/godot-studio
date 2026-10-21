@@ -192,6 +192,9 @@ def register(ctx):
             return json.dumps({
                 "error": f"refusing to overwrite {out}: not a known export artifact of this project",
             })
+        # Godot refuses to export into a missing parent directory — create it
+        # (always inside the project, past the containment guard above).
+        os.makedirs(os.path.dirname(out), exist_ok=True)
         result = _run([godot, "--headless", "--path", project, flag, preset, out], timeout=900)
         return json.dumps(result)
 
