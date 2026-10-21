@@ -1,6 +1,6 @@
 name: godot-studio
 label: Godot Studio
-version: "0.2.0"
+version: "0.2.1"
 description: >
   Headless Godot 4 workflows for the agent game studio — script/resource
   validation without an editor (godot --headless), CI-style exports from

@@ -55,11 +55,19 @@ presets must exist in the project first).
 - **Shell commands**: `godot --headless …` (the local Godot binary), a read-only
   `godot --version` in the desktop backend, and a read-only `hermes mcp list`
   inside `godot_setup`. Nothing else is executed.
+- **Executes the target project's GDScript**: `godot_headless_check` and
+  `godot_export` run the project's own code (autoloads, main scene when
+  `--quit-after` is used, export plugins) with **no approval prompt**. Point
+  them only at projects you trust.
 - **No network calls** by the plugin itself; no reads outside the Godot project
   the caller targets (the desktop pane reads `export_presets.cfg` and artifact
   metadata inside the project path the user configures in the pane).
 - **No stored credentials, no telemetry, no background processes.**
-- `godot_export` writes into the output path the caller supplies.
+- `godot_export` writes only inside the target project: the output path is
+  resolved and must sit inside the project directory, and an existing file is
+  never overwritten unless it is a known export artifact of that project (from
+  `export_presets.cfg`). When no output path is given, the preset's own
+  `export_path` is used.
 
 ## Why this shape
 

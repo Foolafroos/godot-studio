@@ -8,12 +8,6 @@ import os
 import shutil
 import subprocess
 
-_ALLOWED_GODOT_FLAGS = {
-    "--headless", "--quit", "--quit-after", "--path", "--export-release",
-    "--export-debug", "--export-pack", "--main-pack", "--script", "--check-only",
-    "--validate-extension-api", "--build-solutions", "--clean", "--no-header",
-}
-
 
 def _godot_binary() -> str | None:
     """Locate a Godot 4 binary: PATH, then the standard macOS app bundle."""
@@ -90,7 +84,9 @@ def register(ctx):
         "name": "godot_headless_check",
         "description": (
             "Run a Godot project headless and quit, surfacing script/resource errors "
-            "without opening the editor. Use before and after any MCP-driven edit."
+            "without opening the editor. Use before and after any MCP-driven edit. "
+            "Runs the target project's GDScript (autoloads, main scene) with no "
+            "approval prompt — point it only at projects you trust."
         ),
         "parameters": {
             "type": "object",
@@ -128,14 +124,26 @@ def register(ctx):
     # ── Tool: CI-style export ──
     export_schema = {
         "name": "godot_export",
-        "description": "Export a Godot build headless using a named export preset (e.g. 'Web', 'macOS').",
+        "description": (
+            "Export a Godot build headless using a named export preset (e.g. 'Web', "
+            "'macOS'). Runs the project's GDScript and export plugins with no approval "
+            "prompt — point it only at projects you trust. Output is confined to the "
+            "project directory; existing files that aren't known export artifacts are "
+            "never overwritten."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
                 "project_path": {"type": "string"},
                 "preset": {"type": "string", "description": "Export preset name as configured in the project"},
                 "debug": {"type": "boolean", "description": "Use --export-debug instead of --export-release. Default false."},
-                "output_path": {"type": "string", "description": "Optional output file path override"},
+                "output_path": {
+                    "type": "string",
+                    "description": (
+                        "Optional output file path; must resolve inside project_path. "
+                        "Defaults to the preset's export_path from export_presets.cfg."
+                    ),
+                },
             },
             "required": ["project_path", "preset"],
         },
@@ -145,9 +153,45 @@ def register(ctx):
         if not godot:
             return json.dumps({"error": "godot binary not found — install Godot 4 first"})
         project = params.get("project_path", "")
+        if not os.path.exists(os.path.join(project, "project.godot")):
+            return json.dumps({"error": f"no project.godot at {project}"})
         preset = params.get("preset", "")
         flag = "--export-debug" if params.get("debug") else "--export-release"
-        out = params.get("output_path") or "."
+
+        # Resolve the output path: caller override, else the preset's own
+        # export_path from export_presets.cfg. Confine it to the project and
+        # never overwrite a file that isn't a known export artifact of it.
+        presets = _parse_presets(project)
+        known_artifacts = {
+            os.path.realpath(p["artifact_path"])
+            for p in presets if p.get("artifact_path")
+        }
+        out = params.get("output_path")
+        if not out:
+            match = next((p for p in presets if p["preset"] == preset), None)
+            if not match or not match.get("export_path"):
+                return json.dumps({
+                    "error": f"preset '{preset}' has no export_path in export_presets.cfg "
+                             "— pass an explicit output_path inside the project",
+                })
+            out = os.path.join(project, match["export_path"])
+
+        out = os.path.realpath(out)
+        project_root = os.path.realpath(project)
+        if os.path.isdir(out):
+            return json.dumps({"error": f"output_path must be a file path, not a directory: {out}"})
+        try:
+            inside = os.path.commonpath([project_root, out]) == project_root
+        except ValueError:
+            inside = False
+        if not inside:
+            return json.dumps({
+                "error": f"output_path must be inside the project directory ({project_root})",
+            })
+        if os.path.exists(out) and out not in known_artifacts:
+            return json.dumps({
+                "error": f"refusing to overwrite {out}: not a known export artifact of this project",
+            })
         result = _run([godot, "--headless", "--path", project, flag, preset, out], timeout=900)
         return json.dumps(result)
 
@@ -183,7 +227,8 @@ def register(ctx):
         state["next_step"] = (
             "Register godot-ai: open the Godot editor with the godot-ai addon enabled, "
             "then run the 'Run this manually' command it shows for Hermes Agent "
-            "(godot-ai attach over stdio). See vendor/godot-ai/docs/client-configuration.md."
+            "(godot-ai attach over stdio). See "
+            "https://github.com/hi-godot/godot-ai/blob/main/docs/client-configuration.md."
         )
         return json.dumps(state)
 
