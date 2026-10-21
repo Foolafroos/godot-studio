@@ -1,7 +1,7 @@
 ---
 name: godot-studio
 description: "Use when an agent builds or tests a Godot game project."
-version: 0.2.0
+version: 0.2.1
 author: Min (Dingbat) for the Hermes game-studio plugin effort
 license: MIT
 metadata:
@@ -56,6 +56,16 @@ edit via godot-ai MCP  →  godot_headless_check  →  fix reported errors
 - godot-ai needs a LIVE editor; headless checks are a different tool — don't confuse them.
 - `--quit-after N` (frames) is for runtime errors; `--quit` only validates load-time parsing.
 - Export presets must exist in the project (editor → Project → Export); `godot_export` cannot invent one.
+- Export templates are NOT bundled with the editor: an export fails with
+  "export template not found" until they are installed (editor → Manage Export
+  Templates, or `godot --headless --install-export-templates`; if that stalls,
+  download the release `.tpz` from github.com/godotengine/godot-builds and
+  extract `templates/*` for the needed platforms + `version.txt` into
+  `~/Library/Application Support/Godot/export_templates/<version>/`).
+- Godot does not create the output's parent directory — a raw `godot --export-*`
+  into a preset `export_path` whose directory doesn't exist yet fails with
+  "target folder does not exist". `godot_export` creates it (inside the project)
+  before running; when scripting Godot by hand, `mkdir -p` first.
 - Coding-Solo/godot-mcp (5.4k stars) is dormant since 2026-04 — prefer godot-ai.
 - Godot-MCP-Native (pure GDScript, `gdmcp` CLI, progressive discovery) is a valid
   zero-dependency alternative when uv/Node must stay off the machine.
